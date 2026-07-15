@@ -701,11 +701,13 @@ export function createServer(config: ServerConfig, options: CreateServerOptions 
 
   // Register tool listing — filtered by user's scopes when auth is active
   server.setRequestHandler(ListToolsRequestSchema, async (_request, extra) => {
-    // Wait for the startup probe (if provided), but with a timeout so a slow/unreachable
+    // Wait for the startup probe (if provided), but with a short timeout so a slow/unreachable
     // SAP system doesn't stall the MCP connection setup. If the probe doesn't finish in
-    // time, fall back to the default tool set (textSearch unknown = show source_code).
+    // time, fall back to the default tool set (textSearch unknown = show source_code); the
+    // probe keeps running in the background and later tools/list calls pick up real features.
+    // Capped low (2s) so health-check spawns that don't inherit MCP_TIMEOUT still connect green.
     if (startupProbePromise && !multiTarget) {
-      await Promise.race([startupProbePromise, new Promise((resolve) => setTimeout(resolve, 10_000))]);
+      await Promise.race([startupProbePromise, new Promise((resolve) => setTimeout(resolve, 2_000))]);
     }
     const featureKey = config.targetId ?? config.destinationName;
     // Multi-target schemas are immutable process contracts. User-backed feature probes may
